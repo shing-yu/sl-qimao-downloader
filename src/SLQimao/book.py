@@ -6,7 +6,16 @@ import re
 from base64 import b64decode
 from Crypto.Cipher import AES  # noqa
 from Crypto.Util.Padding import unpad  # noqa
-import tqdm
+# import tqdm
+from rich.progress import (
+    Progress,
+    BarColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+    SpinnerColumn,
+    TaskProgressColumn,
+    DownloadColumn
+)
 import time
 import zipfile
 import os
@@ -254,12 +263,32 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
             total_size = int(response.headers.get('content-length', 0))
             block_size = 1024
             # 下载进度
-            with tqdm.tqdm(total=total_size // block_size, unit='KB', unit_scale=True, desc="正在下载缓存文件") as pbar:
+            # with tqdm.tqdm(total=total_size // block_size, unit='KB', unit_scale=True, desc="正在下载缓存文件") as pbar:
+            #     with open(temp, 'wb') as f:
+            #         for data in response.iter_content(block_size):
+            #             pbar.update(1)
+            #             f.write(data)
+            #             time.sleep(0.003)  # 限速约300KB/s
+            with Progress(
+                    "{task.description}",
+                    SpinnerColumn(),
+                    BarColumn(),
+                    # "{task.completed}/{task.total}",
+                    DownloadColumn(),
+                    # TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                    TaskProgressColumn(),
+                    TimeElapsedColumn(),
+                    "<",
+                    TimeRemainingColumn(),
+            ) as progress:
+                task = progress.add_task("[cyan]下载缓存文件", total=total_size)
                 with open(temp, 'wb') as f:
                     for data in response.iter_content(block_size):
-                        pbar.update(1)
                         f.write(data)
-                        time.sleep(0.003)  # 限速约300KB/s
+                        progress.update(task, advance=block_size)
+                        progress.refresh()
+                        time.sleep(0.003)
+
             print(green + f"下载缓存文件成功")
         except Exception as e:
             raise self.DownloadCacheError(f"下载缓存文件失败：{e}")
@@ -357,17 +386,31 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
         with open(self.file_path, 'w', encoding=encoding, errors='ignore') as f:
             start_flag = False
             f.write(self.basecontent)
-            for file, chapter in tqdm.tqdm(zip(txts, self.catalog), desc="合并进度", unit="章"):
-                if start is not None:
-                    if chapter['id'] == start:
-                        start_flag = True
-                    if not start_flag:
-                        continue
-                with open(file, 'r', encoding='utf-8') as txt:
-                    f.write(f"\n\n\n{chapter['title']}\n\n{txt.read()}")
-                if chapter['id'] == hide_index:
-                    f.write(hide_content)
-                self.lastcid = chapter['id']
+            with Progress(
+                    "{task.description}",
+                    SpinnerColumn(),
+                    BarColumn(),
+                    "{task.completed}/{task.total}章",
+                    TaskProgressColumn(),
+                    TimeElapsedColumn(),
+                    "<",
+                    TimeRemainingColumn(),
+            ) as progress:
+                # for file, chapter in tqdm.tqdm(zip(txts, self.catalog), desc="合并进度", unit="章"):
+                task = progress.add_task("[cyan]合并文件", total=len(txts))
+                for file, chapter in zip(txts, self.catalog):
+                    if start is not None:
+                        if chapter['id'] == start:
+                            start_flag = True
+                        if not start_flag:
+                            continue
+                    with open(file, 'r', encoding='utf-8') as txt:
+                        f.write(f"\n\n\n{chapter['title']}\n\n{txt.read()}")
+                    if chapter['id'] == hide_index:
+                        f.write(hide_content)
+                    self.lastcid = chapter['id']
+                    progress.update(task, advance=1)
+                    progress.refresh()
         if start is not None and not start_flag:
             print(red + f"起始章节ID{start}不存在")
             print(red + "合并文件失败")
@@ -417,14 +460,35 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
 """
         with open(os.path.join(path, "简介.txt"), 'w', encoding=encoding) as f:
             f.write(self.basecontent)
-        for file, chapter in tqdm.tqdm(zip(txts, self.catalog), desc="处理进度", unit="章"):
-            with open(file, 'r', encoding='utf-8') as f:
-                content = f.read()
-            with open(os.path.join(path, f"{self._rename(chapter['title'])}.txt"), 'w', encoding=encoding,
-                      errors='ignore') as f:
-                f.write(content)
-                if chapter['id'] == hide_index:
-                    f.write(hide_content)
+        # for file, chapter in tqdm.tqdm(zip(txts, self.catalog), desc="处理进度", unit="章"):
+        #     with open(file, 'r', encoding='utf-8') as f:
+        #         content = f.read()
+        #     with open(os.path.join(path, f"{self._rename(chapter['title'])}.txt"), 'w', encoding=encoding,
+        #               errors='ignore') as f:
+        #         f.write(content)
+        #         if chapter['id'] == hide_index:
+        #             f.write(hide_content)
+        with Progress(
+                "{task.description}",
+                SpinnerColumn(),
+                BarColumn(),
+                "{task.completed}/{task.total}章",
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                "<",
+                TimeRemainingColumn(),
+        ) as progress:
+            task = progress.add_task("[cyan]处理文件", total=len(txts))
+            for file, chapter in zip(txts, self.catalog):
+                with open(file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                with open(os.path.join(path, f"{self._rename(chapter['title'])}.txt"), 'w', encoding=encoding,
+                          errors='ignore') as f:
+                    f.write(content)
+                    if chapter['id'] == hide_index:
+                        f.write(hide_content)
+                progress.update(task, advance=1)
+                progress.refresh()
 
         shutil.rmtree(self.book_id)
         print(green + f"处理文件成功，小说共{len(self.catalog)}章")
@@ -540,24 +604,55 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
 """
 
         # 添加章节
-        for file, chapter in tqdm.tqdm(zip(txts, self.catalog), desc="正在添加章节", unit="章"):
-            chapter_id_name += 1
-            with open(file, 'r', encoding='utf-8') as f:
-                chapter_content = f.read()
-            # 转换文本格式
-            chapter_text = re.sub(r'\n', '</p><p>', chapter_content)
-            if chapter['id'] == hide_index:
-                chapter_text += hide_content
-            # 创建章节实例
-            text = epub.EpubHtml(title=chapter['title'], file_name=f'chapter_{chapter_id_name}.xhtml', lang='zh-CN')
-            for cssitem in cssitems:
-                text.add_item(cssitem)
-            text.content = (f'<h2 class="titlecss">{chapter["title"]}</h2>'
-                            f'<p>{chapter_text}</p>')
-            # 加入索引
-            toc_index += (text, )
-            book.spine.append(text)
-            book.add_item(text)
+        # for file, chapter in tqdm.tqdm(zip(txts, self.catalog), desc="正在添加章节", unit="章"):
+        #     chapter_id_name += 1
+        #     with open(file, 'r', encoding='utf-8') as f:
+        #         chapter_content = f.read()
+        #     # 转换文本格式
+        #     chapter_text = re.sub(r'\n', '</p><p>', chapter_content)
+        #     if chapter['id'] == hide_index:
+        #         chapter_text += hide_content
+        #     # 创建章节实例
+        #     text = epub.EpubHtml(title=chapter['title'], file_name=f'chapter_{chapter_id_name}.xhtml', lang='zh-CN')
+        #     for cssitem in cssitems:
+        #         text.add_item(cssitem)
+        #     text.content = (f'<h2 class="titlecss">{chapter["title"]}</h2>'
+        #                     f'<p>{chapter_text}</p>')
+        #     # 加入索引
+        #     toc_index += (text, )
+        #     book.spine.append(text)
+        #     book.add_item(text)
+        with Progress(
+                "{task.description}",
+                SpinnerColumn(),
+                BarColumn(),
+                "{task.completed}/{task.total}章",
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                "<",
+                TimeRemainingColumn(),
+        ) as progress:
+            task = progress.add_task("[cyan]添加章节", total=len(txts))
+            for file, chapter in zip(txts, self.catalog):
+                chapter_id_name += 1
+                with open(file, 'r', encoding='utf-8') as f:
+                    chapter_content = f.read()
+                # 转换文本格式
+                chapter_text = re.sub(r'\n', '</p><p>', chapter_content)
+                if chapter['id'] == hide_index:
+                    chapter_text += hide_content
+                # 创建章节实例
+                text = epub.EpubHtml(title=chapter['title'], file_name=f'chapter_{chapter_id_name}.xhtml', lang='zh-CN')
+                for cssitem in cssitems:
+                    text.add_item(cssitem)
+                text.content = (f'<h2 class="titlecss">{chapter["title"]}</h2>'
+                                f'<p>{chapter_text}</p>')
+                # 加入索引
+                toc_index += (text, )
+                book.spine.append(text)
+                book.add_item(text)
+                progress.update(task, advance=1)
+                progress.refresh()
         # 加入书籍索引
         book.toc += toc_index
 
