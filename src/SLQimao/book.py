@@ -304,6 +304,8 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
         os.remove(temp)
 
         txts = os.listdir(self.book_id)
+        # 重新以数字大小排序
+        txts.sort(key=lambda x: int(x.split('.')[0]))
         txts = [os.path.join(self.book_id, txt) for txt in txts]
 
         print(yellow + "本程序开源免费，如果您遇到收费情况，请立即退款并举报商家")
@@ -774,6 +776,9 @@ def search() -> str | None:
 
             for i, book in enumerate(books):
                 try:
+                    # 如果没有字数信息则显示未知
+                    if "words_num" not in book:
+                        book["words_num"] = "未知"
                     print(f"{i + 1}. 名称：{book['original_title']} 作者：{book['original_author']} "
                           f"ID：{book['id']} 字数：{book['words_num']}")
                 except KeyError:
