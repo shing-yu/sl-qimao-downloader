@@ -231,7 +231,7 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
             self.message = message
             super().__init__(self.message)
 
-    def _gaunade(self) -> list:
+    def _gaunade(self) -> int:
         """
         原名: get_and_unzip_and_decrypt\n
         获取、解压、解密缓存文件\n
@@ -319,7 +319,7 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
                 f.truncate()
                 f.write(self._decrypt(content))
         print(green + f"解密缓存文件成功")
-        return txts
+        return len(txts)
 
     def write_update(self, datafolder: str) -> None:
         """
@@ -372,8 +372,8 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
 
         # 合并txt文件
         print("开始合并文件")
-        if len(self.catalog) != len(txts):
-            print(red + f"章节数量不匹配，无法合并文件：{len(self.catalog)}章/{len(txts)}章")
+        if len(self.catalog) != txts:
+            print(red + f"章节数量不匹配，无法合并文件：{len(self.catalog)}章/{txts}章")
             print(red + "合并文件失败")
             return
         hide_index = self.catalog[len(self.catalog[self.catalog.index(start) if start is not None else 0:]) // 2]['id']
@@ -399,13 +399,14 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
                     TimeRemainingColumn(),
             ) as progress:
                 # for file, chapter in tqdm.tqdm(zip(txts, self.catalog), desc="合并进度", unit="章"):
-                task = progress.add_task("[cyan]合并文件", total=len(txts))
-                for file, chapter in zip(txts, self.catalog):
+                task = progress.add_task("[cyan]合并文件", total=txts)
+                for chapter in self.catalog:
                     if start is not None:
                         if chapter['id'] == start:
                             start_flag = True
                         if not start_flag:
                             continue
+                    file = os.path.join(self.book_id, f"{chapter['id']}.txt")
                     with open(file, 'r', encoding='utf-8') as txt:
                         f.write(f"\n\n\n{chapter['title']}\n\n{txt.read()}")
                     if chapter['id'] == hide_index:
@@ -446,8 +447,8 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
 
         # 合并txt文件
         print("开始处理文件")
-        if len(self.catalog) != len(txts):
-            print(red + f"章节数量不匹配，无法处理文件：{len(self.catalog)}章/{len(txts)}章")
+        if len(self.catalog) != txts:
+            print(red + f"章节数量不匹配，无法处理文件：{len(self.catalog)}章/{txts}章")
             print(red + "处理文件失败")
             return
         path = os.path.join(path, self.title)
@@ -480,8 +481,9 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
                 "<",
                 TimeRemainingColumn(),
         ) as progress:
-            task = progress.add_task("[cyan]处理文件", total=len(txts))
-            for file, chapter in zip(txts, self.catalog):
+            task = progress.add_task("[cyan]处理文件", total=txts)
+            for chapter in self.catalog:
+                file = os.path.join(self.book_id, f"{chapter['id']}.txt")
                 with open(file, 'r', encoding='utf-8') as f:
                     content = f.read()
                 with open(os.path.join(path, f"{self._rename(chapter['title'])}.txt"), 'w', encoding=encoding,
@@ -591,8 +593,8 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
         toc_index = ()
         chapter_id_name = 0
 
-        if len(self.catalog) != len(txts):
-            print(red + f"章节数量不匹配，无法处理文件：{len(self.catalog)}章/{len(txts)}章")
+        if len(self.catalog) != txts:
+            print(red + f"章节数量不匹配，无法处理文件：{len(self.catalog)}章/{txts}章")
             print(red + "处理文件失败")
             return
 
@@ -634,9 +636,10 @@ Gitee:https://gitee.com/xingyv1024/7mao-novel-downloader/
                 "<",
                 TimeRemainingColumn(),
         ) as progress:
-            task = progress.add_task("[cyan]添加章节", total=len(txts))
-            for file, chapter in zip(txts, self.catalog):
+            task = progress.add_task("[cyan]添加章节", total=txts)
+            for chapter in self.catalog:
                 chapter_id_name += 1
+                file = os.path.join(self.book_id, f"{chapter['id']}.txt")
                 with open(file, 'r', encoding='utf-8') as f:
                     chapter_content = f.read()
                 # 转换文本格式
